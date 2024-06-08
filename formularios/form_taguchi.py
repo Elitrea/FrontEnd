@@ -1,7 +1,6 @@
 import random
 import tkinter as tk
-from tkinter import ttk, filedialog
-from tkinter import font, Text, Scrollbar
+from tkinter import ttk, filedialog, scrolledtext, font, Text, Scrollbar
 import pandas as pd
 from config import COLOR_BARRA_SUPERIOR, COLOR_CUERPO_PRINCIPAL, COLOR_MENU_CURSOR_ENCIMA, COLOR_MENU_LATERAL
 import util.util_ventana as util_ventana
@@ -18,6 +17,13 @@ from statsmodels.formula.api import ols
 import statsmodels.api as sm
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from tkinter.scrolledtext import ScrolledText
+import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
+import statsmodels.api as sm
+from statsmodels.formula.api import ols
+from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk
 
 
 class TaguchiForm(tk.Tk):
@@ -41,7 +47,9 @@ class TaguchiForm(tk.Tk):
 
         # Configurar el ancho y alto de la ventana para cubrir toda la pantalla
         self.geometry(f"{ancho_pantalla}x{alto_pantalla}+0+0")
-    
+        # Definir la fuente predeterminada
+        font.nametofont("TkDefaultFont").configure(family="Helvetica", size=12)
+
     def paneles(self):
         # Crear paneles
         self.barra_superior = tk.Frame(
@@ -64,11 +72,6 @@ class TaguchiForm(tk.Tk):
         self.labelTitulo.config(fg="#fff", font=(
             "Roboto", 15), bg=COLOR_BARRA_SUPERIOR, pady=10, width=20)
         self.labelTitulo.pack(side=tk.LEFT)
-
-        # Botón de menú lateral
-        self.buttonMenuLateral = tk.Button(self.barra_superior, text="\uf0c9", font=font_awesome,
-                                           command=self.toggle_panel, bd=0, bg=COLOR_BARRA_SUPERIOR, fg="white")
-        self.buttonMenuLateral.pack(side=tk.LEFT)
 
     def controles_menu_lateral(self):
         # Configuración del menú lateral
@@ -100,6 +103,8 @@ class TaguchiForm(tk.Tk):
         self.red_neuronal_selector = ttk.Combobox(self.cuerpo_principal, values=red_neuronal_options, font=("Roboto", 12))
         self.red_neuronal_selector.grid(row=0, column=1, padx=10, pady=10, sticky="w")
         self.red_neuronal_selector.current(0)
+        self.red_neuronal_selector.config(state='disabled')
+
 
         # Selector de Porcentaje de Validación
         self.labelPorcentajeValidacion = tk.Label(self.cuerpo_principal, text="¿Porcentaje de Validación?")
@@ -190,6 +195,8 @@ class TaguchiForm(tk.Tk):
             opciones = [opt for opt in opciones_nombres_variable if opt not in selected_options]  # Eliminar opciones ya seleccionadas
             self.campos_variables[i]["selector_nombre"]["values"] = opciones
             self.campos_variables[i]["selector_nombre"].current(0)  # Seleccionar la primera opción por defecto
+
+            self.campos_variables[i]["selector_nombre"].config(state='disabled')
 
             # Almacena la opción seleccionada
             selected_options.append(self.campos_variables[i]["selector_nombre"].get())
@@ -323,50 +330,110 @@ class TaguchiForm(tk.Tk):
 
     def mostrar_resultados_anova(self, df):
         # Crear ventana principal
-        self.resultados_window = tk.Toplevel()
-        self.resultados_window.title("Resultados ANOVA")
+        resultados_window = tk.Toplevel(self)
+        resultados_window.title("Resultados ANOVA")
 
         # Crear un frame para los resultados
-        frame_resultados = tk.Frame(self.resultados_window)
-        frame_resultados.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+        frame_resultados = tk.Frame(resultados_window)
+        frame_resultados.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        # Crear un widget Text para mostrar los resultados
-        text_resultados = Text(frame_resultados, wrap=tk.WORD, width=100, height=20)
+        # Crear un widget ScrolledText para mostrar los resultados
+        text_resultados = scrolledtext.ScrolledText(frame_resultados, wrap=tk.WORD, width=50, height=10)
         text_resultados.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-
-        # Crear un scrollbar para el widget Text
-        scrollbar = Scrollbar(frame_resultados)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        text_resultados.config(yscrollcommand=scrollbar.set)
-        scrollbar.config(command=text_resultados.yview)
-
-        # Verificar nombres de columnas
-        text_resultados.insert(tk.END, f"Columnas del DataFrame: {df.columns}\n")
 
         # Calcular las medias y desviaciones estándar de los entrenamientos
         df['Media'] = df[['G1', 'G2', 'G3', 'G4']].mean(axis=1)
         df['DesviacionEstandar'] = df[['G1', 'G2', 'G3', 'G4']].std(axis=1)
 
-        # Verificar las primeras filas del DataFrame
-        text_resultados.insert(tk.END, f"{df.head()}\n")
+        # Calcular la desviación estándar de cada variable
+        desviaciones_estandar = df[['G1', 'G2', 'G3', 'G4']].std()
 
-        # Ajustar el modelo ANOVA
-        try:
-            model = ols('Media ~ Variable1 + Variable2 + Variable3 + Variable4', data=df).fit()
-            anova_table = sm.stats.anova_lm(model, typ=2)
-            # Mostrar la tabla ANOVA
-            text_resultados.insert(tk.END, f"{anova_table}\n")
-        except ValueError as e:
-            text_resultados.insert(tk.END, f"Error en el análisis ANOVA: {e}\n")
+        # Matriz de correlación
+        corr = df[['Variable1', 'Variable2', 'Variable3', 'Variable4', 'Media']].corr()
+
+        # Crear una figura para las gráficas
+        fig, axs = plt.subplots(2, 1, figsize=(10, 20), gridspec_kw={'height_ratios': [4, 4]})
+
+        # Graficar las desviaciones estándar de cada variable
+        axs[0].bar(desviaciones_estandar.index, desviaciones_estandar.values)
+        axs[0].set_title('Desviación Estándar de Cada Variable')
+        axs[0].set_ylim(0, max(desviaciones_estandar.values) * 1.2)  # Ajustar el límite del eje Y
+        axs[0].set_ylabel('Desviación Estándar')
+
+        # Graficar la matriz de correlación
+        sns.heatmap(corr, annot=True, cmap='coolwarm', center=0, ax=axs[1])
+        axs[1].set_title('Matriz de Correlación de los Parámetros y la Media')
+
+        # Ajustar el espacio entre las subgráficas
+        plt.subplots_adjust(hspace=0.4, top=0.95, bottom=0.05, left=0.05, right=0.95)
+
+        # Crear un frame para la figura de la gráfica
+        fig_frame = tk.Frame(resultados_window, width=800, height=500)
+        fig_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+
+        # Mostrar la figura con las gráficas
+        canvas = FigureCanvasTkAgg(fig, master=fig_frame)
+        canvas.draw()
+        canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+
+        # Crear una barra de desplazamiento para la figura
+        toolbar = NavigationToolbar2Tk(canvas, fig_frame)
+        toolbar.update()
+        canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+
+        # Encontrar el índice del entrenamiento con la media más alta
+        indice_mejor_entrenamiento = df['Media'].idxmax()
+
+        # Obtener los nombres de los entrenamientos
+        mejores_entrenamientos = df.loc[indice_mejor_entrenamiento, ['G1', 'G2', 'G3', 'G4']]
+        text_resultados.insert(tk.END, "Los mejores entrenamientos fueron:\n")
+        text_resultados.insert(tk.END, f"{mejores_entrenamientos}\n")
+
+        # Obtener los valores de los parámetros para el mejor entrenamiento
+        valores_mejores_parametros = df.loc[indice_mejor_entrenamiento, ['Variable1', 'Variable2', 'Variable3', 'Variable4']]
+        text_resultados.insert(tk.END, "Los valores de los parámetros que corresponden al mejor entrenamiento fueron:\n")
+        text_resultados.insert(tk.END, f"{valores_mejores_parametros}\n")
+
+        # Mostrar la figura con las gráficas
+        canvas = FigureCanvasTkAgg(fig, master=frame_resultados)
+        canvas.draw()
+        canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+
+        # Crear una barra de desplazamiento para la figura
+        toolbar = NavigationToolbar2Tk(canvas, frame_resultados)
+        toolbar.update()
+        canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+
+    def mostrar_graficas(self, parent_window, df, anova_table):
+        # Crear una nueva ventana para mostrar la figura con las gráficas
+        fig_window = tk.Toplevel(parent_window)
+        fig_window.title("Gráficas ANOVA")
+
+        # Crear un frame para los resultados
+        frame_resultados = tk.Frame(fig_window)
+        frame_resultados.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        # Crear un widget ScrolledText para mostrar los resultados
+        text_resultados = scrolledtext(frame_resultados, wrap=tk.WORD, width=100, height=20)
+        text_resultados.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        # Verificar nombres de columnas
+        text_resultados.insert(tk.END, f"Columnas del DataFrame: {df.columns}\n")
+
+        # Mostrar la tabla ANOVA
+        text_resultados.insert(tk.END, f"\nResultados del ANOVA:\n{anova_table}\n")
+
+        # Calcular las medias y desviaciones estándar de los entrenamientos
+        df['Media'] = df[['G1', 'G2', 'G3', 'G4']].mean(axis=1)
+        df['DesviacionEstandar'] = df[['G1', 'G2', 'G3', 'G4']].std(axis=1)
 
         # Crear una figura de Matplotlib con subgráficos y espacio entre ellos
-        fig, axs = plt.subplots(3, 1, figsize=(10, 15), sharex=True, gridspec_kw={'hspace': 0.5})
+        fig, axs = plt.subplots(3, 1, figsize=(8, 12), sharex=True, gridspec_kw={'hspace': 0.5})
 
         # Graficar las medias
         sns.barplot(x='Variable1', y='Media', hue='Variable2', data=df, ax=axs[0])
         axs[0].set_title('Media de los Resultados de los Entrenamientos')
 
-        # Graficar las desviaciones estándar
         sns.barplot(x='Variable1', y='DesviacionEstandar', hue='Variable2', data=df, ax=axs[1])
         axs[1].set_title('Desviación Estándar de los Resultados de los Entrenamientos')
 
@@ -375,20 +442,18 @@ class TaguchiForm(tk.Tk):
         sns.heatmap(corr, annot=True, cmap='coolwarm', center=0, ax=axs[2])
         axs[2].set_title('Matriz de Correlación de los Parámetros y la Media')
 
-        # Calcular ANOVA
-        try:
-            model = ols('Media ~ Variable1 + Variable2 + Variable3 + Variable4', data=df).fit()
-            anova_table = sm.stats.anova_lm(model, typ=2)
-            anova_results = str(anova_table)  # Convertir la tabla ANOVA a cadena de texto
-        except ValueError as e:
-            anova_results = f"Error en el análisis ANOVA: {e}"
-
-        # Mostrar los resultados del ANOVA en el widget Text
-        text_resultados.insert(tk.END, anova_results)
-
-        # Mostrar la figura con todos los subgráficos juntos
+        # Ajustar el espacio entre las subgráficas
         plt.tight_layout()  # Ajustar el diseño para evitar superposiciones
-        plt.show()
+
+        # Mostrar la figura en la ventana
+        canvas = FigureCanvasTkAgg(fig, master=frame_resultados)
+        canvas.draw()
+        canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+
+        # Crear una barra de desplazamiento para la figura
+        toolbar = NavigationToolbar2Tk(canvas, frame_resultados)
+        toolbar.update()
+        canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
 
     def guardar_resultado(self, matriz_resultado, resultado_entrenamiento):
         # Encabezados para las columnas de la matriz_resultado

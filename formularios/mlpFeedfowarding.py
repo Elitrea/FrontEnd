@@ -5,6 +5,8 @@ import numpy as np
 import tensorflow as tf
 from sklearn.model_selection import train_test_split
 import os
+from tkinter import font
+
 
 def submit_form():
     def build_model(learning_rate, momentum, epochs, train_size, test_size, val_size, hidden_layers, activations, neurons):
@@ -125,7 +127,7 @@ def guardar_modelo():
 
         # Generar un nuevo ID de modelo
         nuevo_numero = 0
-        while os.path.exists(f"modelos/modelo_{nuevo_numero:02}.h5"):
+        while os.path.exists(f"modelosMLPFF/modelo_{nuevo_numero:02}.h5"):
             nuevo_numero += 1
         modelo_id = f"modelo_{nuevo_numero:02}"
 
@@ -147,7 +149,7 @@ def guardar_modelo():
         df = pd.DataFrame(data)
 
         # Cargar registros existentes
-        log_file_path = os.path.join('modelos', 'log.xlsx')
+        log_file_path = os.path.join('modelosMLPFF', 'log.xlsx')
         if os.path.exists(log_file_path):
             existing_df = pd.read_excel(log_file_path)
             df = pd.concat([existing_df, df], ignore_index=True)
@@ -157,13 +159,13 @@ def guardar_modelo():
 
         # Guardar el modelo
         nuevo_nombre = f"{modelo_id}.h5"
-        nuevo_path = os.path.join('modelos', nuevo_nombre)
+        nuevo_path = os.path.join('modelosMLPFF', nuevo_nombre)
         model.save(nuevo_path)
 
         messagebox.showinfo("Guardar", f"Modelo guardado como {nuevo_nombre}")
 
         # Mostrar un mensaje de éxito y reiniciar el formulario
-        messagebox.showinfo("Guardar", "Modelo guardado exitosamente. El formulario se ha reiniciado.")
+        messagebox.showinfo("Guardar", "Modelo guardado exitosamente.")
 
         # Reiniciar el formulario
         reset_form()
@@ -171,12 +173,7 @@ def guardar_modelo():
         messagebox.showerror("Error", "No hay ningún modelo para guardar.")
 
 def reset_form():
-    # Limpiar los campos de entrada
-    for entry in [learning_rate_entry, momentum_entry, epochs_entry, train_size_entry, test_size_entry, hidden_layers_entry, val_size_entry]:
-        entry.delete(0, tk.END)
-    data_file_label.config(text="")
-    validation_check.set(0)
-    create_dynamic_entries()
+    root.destroy()
 
 def create_dynamic_entries(event=None):
     try:
@@ -196,7 +193,7 @@ def create_dynamic_entries(event=None):
     for i in range(num_hidden_layers):
         neuron_label = tk.Label(root, text=f"Neuronas en la capa {i+1}:")
         neuron_label.grid(row=7+i, column=0)
-        neuron_entry = tk.Entry(root)
+        neuron_entry = tk.Entry(root, font=("Helvetica", 12))
         neuron_entry.grid(row=7+i, column=1)
         neuron_entries.append(neuron_entry)
 
@@ -227,12 +224,13 @@ def select_data_file():
 
 # Crear ventana principal
 root = tk.Tk()
-root.title("Formulario de Entrenamiento de Modelo")
+root.title("Formulario de MLP FeedFowarding")
 
 data_file_path = ""
-
+# Definir la fuente predeterminada
+font.nametofont("TkDefaultFont").configure(family="Helvetica", size=12)
 # Botón para seleccionar el archivo de datos
-data_file_button = tk.Button(root, text="Seleccionar archivo de datos", command=select_data_file)
+data_file_button = tk.Button(root, text="Seleccionar archivo de datos", command=select_data_file, font=("Roboto", 12, "bold"), bg="#800040", fg="white")
 data_file_button.grid(row=0, column=0)
 
 data_file_label = tk.Label(root, text="")
@@ -240,23 +238,23 @@ data_file_label.grid(row=0, column=1)
 
 # Etiquetas y campos de entrada para cada parámetro
 tk.Label(root, text="Tasa de aprendizaje:").grid(row=1, column=0)
-learning_rate_entry = tk.Entry(root)
+learning_rate_entry = tk.Entry(root, font=("Helvetica", 12))
 learning_rate_entry.grid(row=1, column=1)
 
 tk.Label(root, text="Momento:").grid(row=2, column=0)
-momentum_entry = tk.Entry(root)
+momentum_entry = tk.Entry(root, font=("Helvetica", 12))
 momentum_entry.grid(row=2, column=1)
 
 tk.Label(root, text="Épocas:").grid(row=3, column=0)
-epochs_entry = tk.Entry(root)
+epochs_entry = tk.Entry(root, font=("Helvetica", 12))
 epochs_entry.grid(row=3, column=1)
 
 tk.Label(root, text="Tamaño de entrenamiento:").grid(row=4, column=0)
-train_size_entry = tk.Entry(root)
+train_size_entry = tk.Entry(root, font=("Helvetica", 12))
 train_size_entry.grid(row=4, column=1)
 
 tk.Label(root, text="Tamaño de prueba:").grid(row=5, column=0)
-test_size_entry = tk.Entry(root)
+test_size_entry = tk.Entry(root, font=("Helvetica", 12))
 test_size_entry.grid(row=5, column=1)
 
 validation_check = tk.IntVar()
@@ -264,21 +262,22 @@ validation_checkbox = tk.Checkbutton(root, text="¿Usar datos de validación?", 
 validation_checkbox.grid(row=6, column=0)
 
 tk.Label(root, text="Tamaño de validación (opcional):").grid(row=6, column=1)
-val_size_entry = tk.Entry(root, state="disabled")
+val_size_entry = tk.Entry(root, state="disabled", font=("Helvetica", 12))
 val_size_entry.grid(row=6, column=2)
 
 tk.Label(root, text="Capas ocultas:").grid(row=7, column=0)
-hidden_layers_entry = tk.Entry(root)
+hidden_layers_entry = tk.Entry(root, font=("Helvetica", 12))
 hidden_layers_entry.grid(row=7, column=1)
 
 # Botón para enviar el formulario y crear campos de entrada dinámicos
-submit_button = tk.Button(root, text="Entrenar Modelo", command=submit_form)
+submit_button = tk.Button(root, text="Entrenar Modelo", command=submit_form, font=("Roboto", 12, "bold"), bg="#800040", fg="white")
 
 # Widget Text para mostrar los resultados
 results_text = tk.Text(root, height=10, width=50)
+results_text.config(font=("Helvetica", 12))
 
 # Botón para guardar el modelo
-save_model_button = tk.Button(root, text="Guardar Modelo", command=guardar_modelo)
+save_model_button = tk.Button(root, text="Guardar Modelo", command=guardar_modelo, font=("Roboto", 12, "bold"), bg="#800040", fg="white")
 
 # Bind Enter key to create_dynamic_entries
 root.bind("<Return>", lambda event: create_dynamic_entries(event) if str(root.focus_get()) == str(hidden_layers_entry) else None)
