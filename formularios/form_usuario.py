@@ -1,7 +1,13 @@
 import tkinter as tk
 from tkinter import ttk, font, filedialog, messagebox
+import serial.tools.list_ports
 from config import COLOR_BARRA_SUPERIOR, COLOR_CUERPO_PRINCIPAL, COLOR_MENU_CURSOR_ENCIMA, COLOR_MENU_LATERAL
 import util.util_ventana as util_ventana
+import numpy as np
+from tensorflow.keras.models import load_model
+import time
+import serial
+
 
 
 class UsuarioForm(tk.Tk):
@@ -72,6 +78,13 @@ class UsuarioForm(tk.Tk):
         self.data_file_label = tk.Label(self.cuerpo_principal, text="Ningún archivo seleccionado", font=("Roboto", 12))
         self.data_file_label.grid(row=0, column=2, columnspan=3, padx=10, pady=10, sticky="w")
 
+        # Combobox para seleccionar el puerto COM
+        com_label = tk.Label(self.cuerpo_principal, text="Seleccionar puerto COM:", font=("Roboto", 12))
+        com_label.grid(row=1, column=0, padx=10, pady=(10, 5), sticky="w")
+
+        self.combobox_com = ttk.Combobox(self.cuerpo_principal, values=self.get_available_com_ports(), font=("Roboto", 12))
+        self.combobox_com.grid(row=1, column=1, padx=10, pady=(10, 5), sticky="w")
+
         coordenadas_labels_text = ["X", "Y", "Z"]
         self.coordenadas_labels = []
         for i, text in enumerate(coordenadas_labels_text):
@@ -91,10 +104,15 @@ class UsuarioForm(tk.Tk):
         self.enviar_button = tk.Button(self.cuerpo_principal, text="Enviar", command=self.enviar_formulario, font=("Roboto", 12, "bold"), bg="#800040", fg="white")
         self.enviar_button.grid(row=10, column=1, columnspan=2, pady=(10, 5), sticky="w")
 
+    def get_available_com_ports(self):
+        ports = serial.tools.list_ports.comports()
+        return [port.device for port in ports]
+
     def select_data_file(self):
         self.data_file_path = filedialog.askopenfilename(filetypes=[("Model files", "*.h5")])
         if self.data_file_path:
             self.data_file_label.config(text=self.data_file_path)
+            self.model = load_model(self.data_file_path)
 
 
     def enviar_formulario(self):
@@ -103,29 +121,66 @@ class UsuarioForm(tk.Tk):
             messagebox.showerror("Error", "Por favor, selecciona un archivo de datos.")
             return
 
+        # Validar que se haya seleccionado un puerto COM
+        selected_com_port = self.combobox_com.get()
+        if not selected_com_port:
+            messagebox.showerror("Error", "Por favor, selecciona un puerto COM.")
+            return
+
         # Validar coordenadas
         coordenadas = [entry.get() for entry in self.coordenadas_entries]
         if not self.validar_coordenadas(coordenadas):
             messagebox.showerror("Error de validación", "Las coordenadas deben ser valores numéricos.")
             return
 
-        # Procesar la información del formulario
-        modelo = "Modelo: " + self.data_file_label.cget("text")
+        # Convertir coordenadas a float
+        x, y, z = map(float, coordenadas)
 
-        coordenadas_text = []
-        trayectoria_actual = []
-        for i, entry in enumerate(self.coordenadas_entries):
-            label_text = self.coordenadas_labels[i].cget("text")
-            coordenada = f"{label_text.strip(':')} {entry.get()}"
-            trayectoria_actual.append(coordenada)
-            
-            # Cada 3 entradas, agregar el conjunto al resultado final
-            if (i + 1) % 3 == 0:
-                coordenadas_text.append(" ".join(trayectoria_actual))
-                trayectoria_actual = []
+        # Organizar las entradas y orientaciones en una matriz
+        orientation_1 = [1, 0, 0]
+        orientation_2 = [0, 1, 0]
+        orientation_3 = [0, 0, 1]
+        X = np.array([[x, y, z] + orientation_1 + orientation_2 + orientation_3])
 
-        # Puedes realizar las acciones necesarias con la información
-        print(modelo, *coordenadas_text)
+        # Utilizar el modelo para hacer predicciones
+        prediction = self.model.predict(X)
+
+        # Convertir las predicciones de radianes a grados
+        prediccion_grados = self.radianes_a_grados(prediction)
+
+        # Asignar los valores de la predicción en grados a variables individuales
+        valor_prediccion_0, valor_prediccion_1, valor_prediccion_2 = prediccion_grados[0]
+
+        # Ajustar los valores negativos sumando 180
+        if valor_prediccion_0 < 0:
+            valor_prediccion_0 += 180
+        if valor_prediccion_1 < 0:
+            valor_prediccion_1 += 180
+        if valor_prediccion_2 < 0:
+            valor_prediccion_2 += 180
+
+        # Verificar si algún valor de predicción está fuera del rango permitido (0 a 180 grados)
+        if valor_prediccion_0 > 180 or valor_prediccion_1 > 180 or valor_prediccion_2 > 180:
+            messagebox.showerror("Error", "Valores fuera del rango")
+            return
+
+        # Establecer la conexión con Arduino
+        try:
+            arduino = serial.Serial(selected_com_port, 9600, timeout=1)
+            time.sleep(2)  # Esperar a que se establezca la conexión
+        except Exception as e:
+            messagebox.showerror("Error de conexión", f"No se pudo establecer conexión con Arduino: {e}")
+            return
+
+        # Enviar las predicciones a los servos
+        try:
+            arduino.write(f'{int(valor_prediccion_0)},{int(valor_prediccion_1)},{int(valor_prediccion_2)}\n'.encode())
+            arduino.close()
+        except Exception as e:
+            messagebox.showerror("Error de envío", f"No se pudo enviar los datos a Arduino: {e}")
+            return
+
+        messagebox.showinfo("Éxito", "Coordenadas enviadas correctamente a Arduino")
 
     def validar_coordenadas(self, coordenadas):
         if len(coordenadas) != 3:
@@ -136,6 +191,7 @@ class UsuarioForm(tk.Tk):
         except ValueError:
             return False
         return True
+
 
     def configurar_boton_menu(self, button, text, icon, font_awesome, ancho_menu, alto_menu):
         button.config(text=f"   {icon}  {text}", anchor="w", font=font_awesome,
@@ -212,3 +268,12 @@ class UsuarioForm(tk.Tk):
         self.usuario_form.pack_forget()
         self.cuerpo_principal = self.usuario_form
         self.cuerpo_principal.pack(side=tk.RIGHT, fill='both', expand=True)
+    
+    # Función para convertir radianes a grados
+    def radianes_a_grados(self, radianes):
+        return radianes * 57.2958
+
+
+if __name__ == "__main__":
+    app = UsuarioForm()
+    app.mainloop()
