@@ -96,7 +96,7 @@ class EntrenamientoForm(tk.Tk):
         ]
 
         # Crear los botones y etiquetas de descripción correspondientes
-        for i, btn_text in enumerate(["MLP Básica", "MLP FeedFowarding", "CNN"]):
+        for i, btn_text in enumerate(["MLP Básica", "MLP FeedFoward", "CNN"]):
             btn = tk.Button(main_frame, text=btn_text, font=("Roboto", 12, "bold"), bg="#800040", fg="white", command=self.accion_btn1 if i == 0 else self.accion_btn2 if i == 1 else self.accion_btn3)
             btn.grid(row=0, column=i, padx=50, pady=30, sticky="nsew")
             
